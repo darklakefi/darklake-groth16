@@ -5,7 +5,7 @@
 use ark_bls12_381::{Bls12_381, Fr as BlsFr};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ff::{PrimeField, UniformRand};
-use ark_groth16::Groth16;
+use darklake_groth16::Groth16;
 use ark_mnt4_298::{Fr as MNT4Fr, MNT4_298};
 use ark_mnt4_753::{Fr as MNT4BigFr, MNT4_753};
 use ark_mnt6_298::{Fr as MNT6Fr, MNT6_298};

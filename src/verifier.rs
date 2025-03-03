@@ -20,8 +20,46 @@ pub fn prepare_verifying_key<E: Pairing>(vk: &VerifyingKey<E>) -> PreparedVerify
 }
 
 impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
-    /// Prepare proof inputs for use with [`verify_proof_with_prepared_inputs`], wrt the prepared
-    /// verification key `pvk` and instance public inputs.
+    // New function to prepare inputs
+    pub fn prepare_inputs_with_variables(
+        pvk: &PreparedVerifyingKey<E>,
+        static_inputs: &[E::ScalarField],
+        variable_inputs: &[E::ScalarField],
+    ) -> R1CSResult<E::G1> {
+        // Check input counts
+        if static_inputs.len() != pvk.vk.gamma_abc_g1_static.len() - 1 || 
+           variable_inputs.len() != pvk.vk.gamma_abc_g1_variable.len() {
+            return Err(SynthesisError::MalformedVerifyingKey);
+        }
+
+        // Compute the linear combination for static inputs
+        let mut g_ic = pvk.vk.gamma_abc_g1_static[0].into_group();
+        for (i, b) in static_inputs.iter().zip(pvk.vk.gamma_abc_g1_static.iter().skip(1)) {
+            g_ic.add_assign(&b.mul_bigint(i.into_bigint()));
+        }
+
+        // Add the linear combination for variable inputs
+        for (i, b) in variable_inputs.iter().zip(pvk.vk.gamma_abc_g1_variable.iter()) {
+            g_ic.add_assign(&b.mul_bigint(i.into_bigint()));
+        }
+
+        Ok(g_ic)
+    }
+
+    // New verify function supporting variable inputs
+    pub fn verify_proof_with_variables(
+        pvk: &PreparedVerifyingKey<E>,
+        proof: &Proof<E>,
+        static_inputs: &[E::ScalarField],
+        variable_inputs: &[E::ScalarField],
+    ) -> R1CSResult<bool> {
+        let prepared_inputs = Self::prepare_inputs_with_variables(pvk, static_inputs, variable_inputs)?;
+        Self::verify_proof_with_prepared_inputs(pvk, proof, &prepared_inputs)
+    }
+
+    // Prepare proof inputs for use with [`verify_proof_with_prepared_inputs`], wrt the prepared
+    // verification key `pvk` and instance public inputs.
+    /*
     pub fn prepare_inputs(
         pvk: &PreparedVerifyingKey<E>,
         public_inputs: &[E::ScalarField],
@@ -37,6 +75,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
 
         Ok(g_ic)
     }
+    */
 
     /// Verify a Groth16 proof `proof` against the prepared verification key `pvk` and prepared public
     /// inputs. This should be preferred over [`verify_proof`] if the instance's public inputs are
@@ -64,8 +103,9 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
         Ok(test.0 == pvk.alpha_g1_beta_g2)
     }
 
-    /// Verify a Groth16 proof `proof` against the prepared verification key `pvk`,
-    /// with respect to the instance `public_inputs`.
+    // Verify a Groth16 proof `proof` against the prepared verification key `pvk`,
+    // with respect to the instance `public_inputs`.
+    /*
     pub fn verify_proof(
         pvk: &PreparedVerifyingKey<E>,
         proof: &Proof<E>,
@@ -74,4 +114,5 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
         let prepared_inputs = Self::prepare_inputs(pvk, public_inputs)?;
         Self::verify_proof_with_prepared_inputs(pvk, proof, &prepared_inputs)
     }
+    */
 }

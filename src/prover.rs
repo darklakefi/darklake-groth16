@@ -29,6 +29,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
         s: E::ScalarField,
         matrices: &ConstraintMatrices<E::ScalarField>,
         num_inputs: usize,
+        num_static_inputs: usize,
         num_constraints: usize,
         full_assignment: &[E::ScalarField],
     ) -> R1CSResult<Proof<E>> {
@@ -41,7 +42,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
             full_assignment,
         )?;
         end_timer!(witness_map_time);
-        let input_assignment = &full_assignment[1..num_inputs];
+        let input_assignment = &full_assignment[1..num_static_inputs];
         let aux_assignment = &full_assignment[num_inputs..];
         let proof =
             Self::create_proof_with_assignment(pk, r, s, &h, input_assignment, aux_assignment)?;

@@ -40,7 +40,9 @@ pub struct VerifyingKey<E: Pairing> {
     pub delta_g2: E::G2Affine,
     /// The `gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where `H` is
     /// the generator of `E::G1`.
-    pub gamma_abc_g1: Vec<E::G1Affine>,
+    // pub gamma_abc_g1: Vec<E::G1Affine>,
+    pub gamma_abc_g1_static: Vec<E::G1Affine>,   // For inputs known at proving time
+    pub gamma_abc_g1_variable: Vec<E::G1Affine>, // For inputs only known at verification time
 }
 
 impl<E: Pairing> Default for VerifyingKey<E> {
@@ -50,7 +52,8 @@ impl<E: Pairing> Default for VerifyingKey<E> {
             beta_g2: E::G2Affine::default(),
             gamma_g2: E::G2Affine::default(),
             delta_g2: E::G2Affine::default(),
-            gamma_abc_g1: Vec::new(),
+            gamma_abc_g1_static: Vec::new(),
+            gamma_abc_g1_variable: Vec::new(),
         }
     }
 }
@@ -66,7 +69,10 @@ where
         self.beta_g2.to_sponge_bytes(dest);
         self.gamma_g2.to_sponge_bytes(dest);
         self.delta_g2.to_sponge_bytes(dest);
-        self.gamma_abc_g1
+        self.gamma_abc_g1_static
+            .iter()
+            .for_each(|g| g.to_sponge_bytes(dest));
+        self.gamma_abc_g1_variable
             .iter()
             .for_each(|g| g.to_sponge_bytes(dest));
     }
@@ -76,7 +82,10 @@ where
         self.beta_g2.to_sponge_field_elements(dest);
         self.gamma_g2.to_sponge_field_elements(dest);
         self.delta_g2.to_sponge_field_elements(dest);
-        self.gamma_abc_g1
+        self.gamma_abc_g1_static
+            .iter()
+            .for_each(|g| g.to_sponge_field_elements(dest));
+        self.gamma_abc_g1_variable
             .iter()
             .for_each(|g| g.to_sponge_field_elements(dest));
     }

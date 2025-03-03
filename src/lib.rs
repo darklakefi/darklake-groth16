@@ -67,7 +67,12 @@ impl<E: Pairing, QAP: R1CSToQAP> SNARK<E::ScalarField> for Groth16<E, QAP> {
         circuit: C,
         rng: &mut R,
     ) -> Result<(Self::ProvingKey, Self::VerifyingKey), Self::Error> {
-        let pk = Self::generate_random_parameters_with_reduction(circuit, rng)?;
+        let pk = Self::generate_random_parameters_with_reduction(
+            circuit, 
+            rng,
+            1,  // num_static_inputs - typically 1 for the "one" input
+            0,  // num_inputs - or determine dynamically if needed
+        )?;
         let vk = pk.vk.clone();
 
         Ok((pk, vk))
@@ -92,7 +97,12 @@ impl<E: Pairing, QAP: R1CSToQAP> SNARK<E::ScalarField> for Groth16<E, QAP> {
         x: &[E::ScalarField],
         proof: &Self::Proof,
     ) -> Result<bool, Self::Error> {
-        Ok(Self::verify_proof(&circuit_pvk, proof, &x)?)
+        // Split inputs into static and variable parts
+        // Assuming the first element is static (like "one") and the rest are variable
+        let static_inputs = &x[..1];  // First element is static
+        let variable_inputs = &x[1..]; // Rest are variable
+        
+        Ok(Self::verify_proof_with_variables(&circuit_pvk, proof, static_inputs, variable_inputs)?)
     }
 }
 

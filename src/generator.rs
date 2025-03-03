@@ -1,6 +1,6 @@
 use crate::{r1cs_to_qap::R1CSToQAP, Groth16, ProvingKey, Vec, VerifyingKey};
-use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, CurveGroup};
-use ark_ff::{Field, UniformRand, Zero};
+use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
+use ark_ff::{Field, UniformRand, Zero, PrimeField};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_relations::r1cs::{
     ConstraintSynthesizer, ConstraintSystem, OptimizationGoal, Result as R1CSResult,
@@ -8,6 +8,8 @@ use ark_relations::r1cs::{
 };
 use ark_std::rand::Rng;
 use ark_std::{cfg_into_iter, cfg_iter};
+
+use std::ops::Mul;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -19,6 +21,8 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
     pub fn generate_random_parameters_with_reduction<C>(
         circuit: C,
         rng: &mut impl Rng,
+        num_static_inputs: usize,
+        num_inputs: usize,
     ) -> R1CSResult<ProvingKey<E>>
     where
         C: ConstraintSynthesizer<E::ScalarField>,
@@ -37,6 +41,8 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
             beta,
             gamma,
             delta,
+            num_static_inputs,
+            num_inputs,
             g1_generator,
             g2_generator,
             rng,
@@ -50,6 +56,8 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
         beta: E::ScalarField,
         gamma: E::ScalarField,
         delta: E::ScalarField,
+        num_static_inputs: usize,
+        num_inputs: usize,
         g1_generator: E::G1,
         g2_generator: E::G2,
         rng: &mut impl Rng,
@@ -126,39 +134,43 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
 
         // Compute B window table
         let g2_time = start_timer!(|| "Compute G2 table");
-        let g2_table = BatchMulPreprocessing::new(g2_generator, non_zero_b);
         end_timer!(g2_time);
 
         // Compute the B-query in G2
         let b_g2_time = start_timer!(|| format!("Calculate B G2 of size {}", b.len()));
-        let b_g2_query = g2_table.batch_mul(&b);
-        drop(g2_table);
+        // We need to handle a vector of points and convert to affine
+        let b_g2_query = cfg_iter!(b)
+            .map(|b_i| g2_generator.mul(b_i).into_affine())
+            .collect::<Vec<_>>();
         end_timer!(b_g2_time);
 
         // Compute G window table
         let g1_window_time = start_timer!(|| "Compute G1 window table");
         let num_scalars = non_zero_a + non_zero_b + qap_num_variables + m_raw + 1;
-        let g1_table = BatchMulPreprocessing::new(g1_generator, num_scalars);
         end_timer!(g1_window_time);
 
         // Generate the R1CS proving key
         let proving_key_time = start_timer!(|| "Generate the R1CS proving key");
 
-        let alpha_g1 = g1_generator * &alpha;
-        let beta_g1 = g1_generator * &beta;
-        let beta_g2 = g2_generator * &beta;
-        let delta_g1 = g1_generator * &delta;
-        let delta_g2 = g2_generator * &delta;
+        let alpha_g1 = g1_generator.mul(&alpha).into_affine();
+        let beta_g1 = g1_generator.mul(&beta).into_affine();
+        let beta_g2 = g2_generator.mul(&beta).into_affine();
+        let delta_g1 = g1_generator.mul(&delta).into_affine();
+        let delta_g2 = g2_generator.mul(&delta).into_affine();
 
         // Compute the A-query
         let a_time = start_timer!(|| "Calculate A");
-        let a_query = g1_table.batch_mul(&a);
+        let a_query = cfg_iter!(a)
+            .map(|a_i| g1_generator.mul(a_i).into_affine())
+            .collect::<Vec<_>>();
         drop(a);
         end_timer!(a_time);
 
         // Compute the B-query in G1
         let b_g1_time = start_timer!(|| "Calculate B G1");
-        let b_g1_query = g1_table.batch_mul(&b);
+        let b_g1_query = cfg_iter!(b)
+            .map(|b_i| g1_generator.mul(b_i).into_affine())
+            .collect::<Vec<_>>();
         drop(b);
         end_timer!(b_g1_time);
 
@@ -166,12 +178,16 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
         let h_time = start_timer!(|| "Calculate H");
         let h_scalars =
             QAP::h_query_scalars::<_, D<E::ScalarField>>(m_raw - 1, t, zt, delta_inverse)?;
-        let h_query = g1_table.batch_mul(&h_scalars);
+        let h_query = cfg_iter!(h_scalars)
+            .map(|h_i| g1_generator.mul(h_i).into_affine())
+            .collect::<Vec<_>>();
         end_timer!(h_time);
 
         // Compute the L-query
         let l_time = start_timer!(|| "Calculate L");
-        let l_query = g1_table.batch_mul(&l);
+        let l_query = cfg_iter!(l)
+            .map(|l_i| g1_generator.mul(l_i).into_affine())
+            .collect::<Vec<_>>();
         drop(l);
         end_timer!(l_time);
 
@@ -179,26 +195,35 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
 
         // Generate R1CS verification key
         let verifying_key_time = start_timer!(|| "Generate the R1CS verification key");
-        let gamma_g2 = g2_generator * &gamma;
-        let gamma_abc_g1 = g1_table.batch_mul(&gamma_abc);
-        drop(g1_table);
+        let gamma_g2 = g2_generator.mul(&gamma).into_affine();
+
+        // Calculate gamma_abc_g1
+        let gamma_abc_g1_static = cfg_iter!(gamma_abc[..num_static_inputs])
+            .map(|g_a| g1_generator.mul(g_a).into_affine())
+            .collect::<Vec<_>>();
+            
+        let gamma_abc_g1_variable = cfg_iter!(gamma_abc[num_static_inputs..])
+            .map(|g_a| g1_generator.mul(g_a).into_affine())
+            .collect::<Vec<_>>();
 
         end_timer!(verifying_key_time);
 
+        // Create the verification key
         let vk = VerifyingKey::<E> {
-            alpha_g1: alpha_g1.into_affine(),
-            beta_g2: beta_g2.into_affine(),
-            gamma_g2: gamma_g2.into_affine(),
-            delta_g2: delta_g2.into_affine(),
-            gamma_abc_g1,
+            alpha_g1,
+            beta_g2,
+            gamma_g2,
+            delta_g2,
+            gamma_abc_g1_static,
+            gamma_abc_g1_variable,
         };
 
         end_timer!(setup_time);
 
         Ok(ProvingKey {
             vk,
-            beta_g1: beta_g1.into_affine(),
-            delta_g1: delta_g1.into_affine(),
+            beta_g1,
+            delta_g1,
             a_query,
             b_g1_query,
             b_g2_query,

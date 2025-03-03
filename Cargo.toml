@@ -1,10 +1,10 @@
 [package]
-name = "ark-groth16"
+name = "darklake-groth16"
 version = "0.4.0"
-authors = [ "arkworks contributors" ]
-description = "An implementation of the Groth 2016 zkSNARK proof system"
-homepage = "https://arkworks.rs"
-repository = "https://github.com/arkworks-rs/groth16"
+authors = [ "darklake team", "arkworks contributors" ]
+description = "A fork of the ark-groth16 implementation for the Darklake Protocol"
+homepage = "https://github.com/darklake-protocol/darklake-groth16"
+repository = "https://github.com/darklake-protocol/darklake-groth16"
 documentation = "https://docs.rs/ark-groth16/"
 keywords = [ "zero-knowledge", "cryptography", "zkSNARK", "SNARK", "Groth-Maller" ]
 categories = [ "cryptography" ]
@@ -78,25 +78,3 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
-
-
-[patch.crates-io]
-ark-ff = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-ec = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-poly = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-serialize = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-bls12-381 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-mnt4-298 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-mnt6-298 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-mnt4-753 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-mnt6-753 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-bls12-377 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-bw6-761 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-bn254 = { git = "https://github.com/arkworks-rs/algebra/" }
-ark-std = { git = "https://github.com/arkworks-rs/std/" }
-
-ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std/" }
-ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives/" }
-
-ark-relations = { git = "https://github.com/arkworks-rs/snark/" }
-ark-snark = { git = "https://github.com/arkworks-rs/snark/" }
