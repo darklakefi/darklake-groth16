@@ -102,7 +102,7 @@ impl<E: Pairing, QAP: R1CSToQAP> SNARK<E::ScalarField> for Groth16<E, QAP> {
         let static_inputs = &x[..1];  // First element is static
         let variable_inputs = &x[1..]; // Rest are variable
         
-        Ok(Self::verify_proof_with_variables(&circuit_pvk, proof, static_inputs, variable_inputs)?)
+        Ok(Self::verify_with_variables(&circuit_pvk, proof, static_inputs, variable_inputs)?)
     }
 }
 
