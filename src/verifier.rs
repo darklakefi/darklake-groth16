@@ -26,28 +26,25 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16<E, QAP> {
         static_inputs: &[E::ScalarField],
         variable_inputs: &[E::ScalarField],
     ) -> R1CSResult<E::G1> {
-        // Calculate the expected total inputs length
-        let expected_total_inputs = static_inputs.len() + variable_inputs.len();
-        
-        // Check that the number of inputs matches the gamma_abc_g1 size
-        if expected_total_inputs + 1 != (pvk.vk.gamma_abc_g1_static.len() + pvk.vk.gamma_abc_g1_variable.len()) {
+        // Check that the number of inputs matches the expected sizes
+        if static_inputs.len() != pvk.vk.gamma_abc_g1_static.len() - 1 {
             return Err(SynthesisError::MalformedVerifyingKey);
         }
-
+        if variable_inputs.len() != pvk.vk.gamma_abc_g1_variable.len() {
+            return Err(SynthesisError::MalformedVerifyingKey);
+        }
+    
         // Start with the constant term
         let mut g_ic = pvk.vk.gamma_abc_g1_static[0].into_group();
         
-        // Add static inputs first
+        // Add static inputs
         for (i, static_input) in static_inputs.iter().enumerate() {
-            let idx = i + 1; // +1 for the constant term
-            g_ic.add_assign(&pvk.vk.gamma_abc_g1_static[idx].mul_bigint(static_input.into_bigint()));
+            g_ic.add_assign(&pvk.vk.gamma_abc_g1_static[i + 1].mul_bigint(static_input.into_bigint()));
         }
         
-        // Add variable inputs
-        let static_offset = static_inputs.len() + 1; // +1 for the constant term
+        // Add variable inputs (no offset needed - separate vector)
         for (i, variable_input) in variable_inputs.iter().enumerate() {
-            let idx = static_offset + i;
-            g_ic.add_assign(&pvk.vk.gamma_abc_g1_variable[idx].mul_bigint(variable_input.into_bigint()));
+            g_ic.add_assign(&pvk.vk.gamma_abc_g1_variable[i].mul_bigint(variable_input.into_bigint()));
         }
         
         Ok(g_ic)
